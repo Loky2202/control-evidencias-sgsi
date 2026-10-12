@@ -8,6 +8,7 @@ import Section from './components/Section';
 import ProjectStructure from './components/ProjectStructure';
 import BuildOrder from './components/BuildOrder';
 import AttentionPoints from './components/AttentionPoints';
+import DeployGuide from './components/DeployGuide';
 import { Menu, X } from 'lucide-react';
 
 function App() {
@@ -490,6 +491,11 @@ find backups -name 'evidencias_*.dump' -mtime +14 -delete`} />
         {/* Section 8: Puntos de atención */}
         <Section id="atencion" number="8" title="Puntos de atención">
           <AttentionPoints />
+        </Section>
+
+        {/* Section 9: Despliegue */}
+        <Section id="despliegue" number="9" title="Cómo desplegar el proyecto">
+          <DeployGuide />
         </Section>
 
         {/* Footer */}

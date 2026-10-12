@@ -16,6 +16,7 @@ const sections = [
   { id: 'gestion', label: 'Gestión', number: '6' },
   { id: 'orden', label: 'Orden de construcción', number: '7' },
   { id: 'atencion', label: 'Puntos de atención', number: '8' },
+  { id: 'despliegue', label: 'Despliegue', number: '9' },
 ];
 
 export default function Sidebar({ activeSection, onNavigate, mobileOpen, onClose }: SidebarProps) {
