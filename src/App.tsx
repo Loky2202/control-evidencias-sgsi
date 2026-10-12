@@ -10,6 +10,7 @@ import BuildOrder from './components/BuildOrder';
 import AttentionPoints from './components/AttentionPoints';
 import DeployGuide from './components/DeployGuide';
 import ProjectComposition from './components/ProjectComposition';
+import Documentation from './components/Documentation';
 import { Menu, X } from 'lucide-react';
 
 function App() {
@@ -502,6 +503,11 @@ find backups -name 'evidencias_*.dump' -mtime +14 -delete`} />
         {/* Section 10: Despliegue */}
         <Section id="despliegue" number="10" title="Cómo desplegar el proyecto">
           <DeployGuide />
+        </Section>
+
+        {/* Section 11: Documentación */}
+        <Section id="documentacion" number="11" title="README.md y notas de decisiones">
+          <Documentation />
         </Section>
 
         {/* Footer */}

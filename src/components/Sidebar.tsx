@@ -18,6 +18,7 @@ const sections = [
   { id: 'atencion', label: 'Puntos de atención', number: '8' },
   { id: 'composicion', label: 'Composición', number: '9' },
   { id: 'despliegue', label: 'Despliegue', number: '10' },
+  { id: 'documentacion', label: 'README y decisiones', number: '11' },
 ];
 
 export default function Sidebar({ activeSection, onNavigate, mobileOpen, onClose }: SidebarProps) {
