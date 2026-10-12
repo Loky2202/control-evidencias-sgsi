@@ -1,0 +1,27 @@
+# Configuración de desarrollo
+# Este archivo NO debe subirse a producción
+
+services:
+  # API con recarga automática
+  api:
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ./backend:/app
+    environment:
+      AUTH_DISABLED: "true"
+      ENVIRONMENT: "development"
+    ports:
+      - "8000:8000"
+
+  # Base de datos accesible desde el host (solo desarrollo)
+  db:
+    networks:
+      - data
+      - edge
+    ports:
+      - "127.0.0.1:5432:5432"
+
+  # Frontend sin construir (Vite dev server)
+  web:
+    profiles:
+      - donotrun
