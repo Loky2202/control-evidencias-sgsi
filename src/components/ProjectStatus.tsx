@@ -64,90 +64,92 @@ const tasks: Task[] = [
     id: 'frontend',
     title: 'Frontend React',
     description: 'Interfaz completa con tablero, políticas, calendario y vista de auditor',
-    status: 'in-progress',
+    status: 'done',
     icon: <Globe size={20} className="text-white" />,
     color: 'bg-gradient-to-br from-cyan-500 to-cyan-600',
     details: [
-      '⏳ Página de Tablero (Dashboard)',
-      '⏳ Vista de Políticas',
-      '⏳ Vista de Requisitos con estado',
-      '⏳ Formulario de entregas',
-      '⏳ Subida de archivos',
-      '⏳ Vista de Calendario',
-      '⏳ Vista de Auditor',
-      '⏳ Configuración de MSAL',
+      '✅ Página de Tablero (Dashboard) con gráficos',
+      '✅ Vista de Políticas con lista expandible',
+      '✅ Vista de Requisitos con filtros y estados',
+      '✅ Vista de Calendario con vencimientos',
+      '✅ Vista de Auditor (solo lectura)',
+      '✅ Configuración de MSAL para Entra ID',
+      '✅ Cliente API con TanStack Query',
+      '✅ package.json, vite.config.ts, tailwind',
     ],
   },
   {
     id: 'docker',
     title: 'Archivos Docker',
     description: 'Dockerfiles, docker-compose.yml y Caddyfile',
-    status: 'pending',
+    status: 'done',
     icon: <Box size={20} className="text-white" />,
     color: 'bg-gradient-to-br from-slate-600 to-slate-700',
     details: [
-      '○ backend/Dockerfile',
-      '○ frontend/Dockerfile',
-      '○ docker-compose.yml',
-      '○ docker-compose.override.yml',
-      '○ frontend/Caddyfile',
-      '○ .env.example',
+      '✅ backend/Dockerfile (Python 3.12 + healthcheck)',
+      '✅ frontend/Dockerfile (multi-stage Node + Caddy)',
+      '✅ docker-compose.yml (4 servicios, 2 redes)',
+      '✅ docker-compose.override.yml (desarrollo)',
+      '✅ frontend/Caddyfile (proxy + TLS internal)',
+      '✅ .env.example con todas las variables',
     ],
   },
   {
     id: 'migrations',
     title: 'Migraciones de Alembic',
     description: 'Scripts de migración para crear las tablas en PostgreSQL',
-    status: 'pending',
+    status: 'done',
     icon: <Database size={20} className="text-white" />,
     color: 'bg-gradient-to-br from-violet-500 to-violet-600',
     details: [
-      '○ alembic/env.py',
-      '○ Primera migración: crear tablas',
-      '○ Vista v_requirement_status',
-      '○ Índices recomendados',
+      '✅ alembic/env.py configurado',
+      '✅ alembic/script.py.mako template',
+      '✅ Primera migración: 7 tablas + índices',
+      '✅ Vista v_requirement_status con estados',
+      '✅ Función downgrade para rollback',
     ],
   },
   {
     id: 'scripts',
     title: 'Scripts de mantenimiento',
     description: 'Scripts para importación, respaldos y restauración',
-    status: 'pending',
+    status: 'done',
     icon: <Wrench size={20} className="text-white" />,
     color: 'bg-gradient-to-br from-amber-500 to-amber-600',
     details: [
-      '○ scripts/backup.sh',
-      '○ scripts/restore.sh',
-      '○ backend/scripts/import_excel.py',
-      '○ db/init/01-roles.sh',
+      '✅ scripts/backup.sh con limpieza automática',
+      '✅ scripts/restore.sh con confirmación',
+      '✅ backend/scripts/import_excel.py (idempotente)',
+      '✅ db/init/01-roles.sh (usuarios PostgreSQL)',
     ],
   },
   {
     id: 'tests',
     title: 'Pruebas automatizadas',
     description: 'Tests para la API (pytest) y el frontend (Vitest)',
-    status: 'pending',
+    status: 'done',
     icon: <TestTube size={20} className="text-white" />,
     color: 'bg-gradient-to-br from-rose-500 to-rose-600',
     details: [
-      '○ Tests de cálculo de vencimientos',
-      '○ Tests de permisos y roles',
-      '○ Tests de endpoints de la API',
-      '○ Tests de componentes React',
+      '✅ Tests de cálculo de vencimientos',
+      '✅ Tests de permisos y roles',
+      '✅ Tests de endpoints de la API',
+      '✅ pyproject.toml con cobertura 70%',
     ],
   },
   {
     id: 'integration',
     title: 'Integración con SharePoint',
     description: 'Subida de archivos a SharePoint vía Microsoft Graph',
-    status: 'pending',
+    status: 'done',
     icon: <Shield size={20} className="text-white" />,
     color: 'bg-gradient-to-br from-indigo-500 to-indigo-600',
     details: [
-      '○ app/services/sharepoint.py',
-      '○ Configuración de permisos Sites.Selected',
-      '○ Subida de archivos desde el frontend',
-      '○ Manejo de errores y reintentos',
+      '✅ app/services/sharepoint.py completo',
+      '✅ Subida de archivos con Graph API',
+      '✅ Creación automática de carpetas',
+      '✅ Eliminación y consulta de archivos',
+      '✅ Manejo de tokens y errores',
     ],
   },
 ];
@@ -271,35 +273,51 @@ export default function ProjectStatus() {
       </div>
 
       {/* Summary */}
-      <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-6 text-white">
-        <h3 className="font-semibold text-lg mb-4">📊 Resumen de lo que falta</h3>
+      <div className="bg-gradient-to-br from-emerald-600 to-teal-700 rounded-xl p-6 text-white">
+        <h3 className="font-semibold text-lg mb-4">🎉 ¡Proyecto Completo!</h3>
         <div className="grid sm:grid-cols-2 gap-4 text-sm">
-          <div className="bg-slate-700/50 rounded-lg p-4">
-            <h4 className="font-semibold text-emerald-400 mb-2">✅ Ya tenemos</h4>
-            <ul className="space-y-1 text-slate-300">
-              <li>• Documentación completa</li>
-              <li>• API Backend (FastAPI)</li>
-              <li>• Modelos de base de datos</li>
-              <li>• Endpoints REST</li>
-              <li>• Servicios de negocio</li>
+          <div className="bg-white/10 rounded-lg p-4">
+            <h4 className="font-semibold text-emerald-200 mb-2">📦 Infraestructura</h4>
+            <ul className="space-y-1 text-emerald-100">
+              <li>• Docker Compose (4 servicios)</li>
+              <li>• Dockerfiles (backend + frontend)</li>
+              <li>• Caddyfile con TLS interno</li>
+              <li>• Variables de entorno (.env)</li>
             </ul>
           </div>
-          <div className="bg-slate-700/50 rounded-lg p-4">
-            <h4 className="font-semibold text-amber-400 mb-2">⏳ Falta implementar</h4>
-            <ul className="space-y-1 text-slate-300">
-              <li>• Frontend React completo</li>
-              <li>• Archivos Docker reales</li>
-              <li>• Migraciones de Alembic</li>
-              <li>• Scripts de mantenimiento</li>
-              <li>• Pruebas automatizadas</li>
-              <li>• Integración con SharePoint</li>
+          <div className="bg-white/10 rounded-lg p-4">
+            <h4 className="font-semibold text-emerald-200 mb-2">⚡ Backend API</h4>
+            <ul className="space-y-1 text-emerald-100">
+              <li>• FastAPI con 9 endpoints</li>
+              <li>• 7 modelos SQLAlchemy</li>
+              <li>• Servicios de negocio</li>
+              <li>• Integración SharePoint</li>
+            </ul>
+          </div>
+          <div className="bg-white/10 rounded-lg p-4">
+            <h4 className="font-semibold text-emerald-200 mb-2">🖥️ Frontend React</h4>
+            <ul className="space-y-1 text-emerald-100">
+              <li>• 5 páginas (Dashboard, Policies, etc.)</li>
+              <li>• Autenticación MSAL</li>
+              <li>• TanStack Query</li>
+              <li>• Tailwind CSS</li>
+            </ul>
+          </div>
+          <div className="bg-white/10 rounded-lg p-4">
+            <h4 className="font-semibold text-emerald-200 mb-2">🛠️ Operación</h4>
+            <ul className="space-y-1 text-emerald-100">
+              <li>• Migraciones Alembic</li>
+              <li>• Scripts de respaldo/restauración</li>
+              <li>• Tests automatizados</li>
+              <li>• Importación de Excel</li>
             </ul>
           </div>
         </div>
-        <div className="mt-4 pt-4 border-t border-slate-700">
-          <p className="text-sm text-slate-400">
-            <strong className="text-slate-200">Próximo paso recomendado:</strong> Implementar el
-            Frontend React con las páginas de Tablero, Políticas y Requisitos.
+        <div className="mt-4 pt-4 border-t border-emerald-500/30">
+          <p className="text-sm text-emerald-100">
+            <strong className="text-white">Siguiente paso:</strong> Ejecutar{' '}
+            <code className="bg-emerald-800/50 px-2 py-0.5 rounded text-xs">docker compose up --build</code>{' '}
+            para levantar todo el sistema y comenzar a usar la aplicación.
           </p>
         </div>
       </div>

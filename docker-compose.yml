@@ -1,0 +1,76 @@
+name: evidencias-iso
+
+services:
+  # Base de datos PostgreSQL
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_OWNER}
+      POSTGRES_PASSWORD: ${DB_OWNER_PASSWORD}
+      DB_APP_USER: ${DB_APP_USER}
+      DB_APP_PASSWORD: ${DB_APP_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_OWNER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Migraciones (one-shot)
+  migrate:
+    build: ./backend
+    command: alembic upgrade head
+    environment:
+      DATABASE_URL: postgresql+psycopg://${DB_OWNER}:${DB_OWNER_PASSWORD}@db:5432/${DB_NAME}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - data
+
+  # API Backend
+  api:
+    build: ./backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://${DB_APP_USER}:${DB_APP_PASSWORD}@db:5432/${DB_NAME}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - data
+      - edge
+
+  # Frontend + Proxy
+  web:
+    build: ./frontend
+    restart: unless-stopped
+    environment:
+      APP_HOST: ${APP_HOST}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+    networks:
+      - edge
+
+networks:
+  data:
+    internal: true
+  edge:
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

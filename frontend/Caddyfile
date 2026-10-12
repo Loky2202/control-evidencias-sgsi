@@ -1,0 +1,28 @@
+{$APP_HOST} {
+	# TLS interno para desarrollo/red local
+	tls internal
+	
+	# Compresión gzip
+	encode gzip
+	
+	# Proxy para API
+	handle /api/* {
+		reverse_proxy api:8000
+	}
+	
+	# Servir frontend
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+	
+	# Logs
+	log {
+		output file /data/access.log {
+			roll_size 10mb
+			roll_keep 5
+			roll_keep_for 720h
+		}
+	}
+}
