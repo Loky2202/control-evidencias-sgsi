@@ -9,6 +9,7 @@ import ProjectStructure from './components/ProjectStructure';
 import BuildOrder from './components/BuildOrder';
 import AttentionPoints from './components/AttentionPoints';
 import DeployGuide from './components/DeployGuide';
+import ProjectComposition from './components/ProjectComposition';
 import { Menu, X } from 'lucide-react';
 
 function App() {
@@ -493,8 +494,13 @@ find backups -name 'evidencias_*.dump' -mtime +14 -delete`} />
           <AttentionPoints />
         </Section>
 
-        {/* Section 9: Despliegue */}
-        <Section id="despliegue" number="9" title="Cómo desplegar el proyecto">
+        {/* Section 9: Composición del proyecto */}
+        <Section id="composicion" number="9" title="Cómo se compone el proyecto">
+          <ProjectComposition />
+        </Section>
+
+        {/* Section 10: Despliegue */}
+        <Section id="despliegue" number="10" title="Cómo desplegar el proyecto">
           <DeployGuide />
         </Section>
 
