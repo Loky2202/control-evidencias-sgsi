@@ -10,6 +10,7 @@ import BuildOrder from './components/BuildOrder';
 import AttentionPoints from './components/AttentionPoints';
 import DeployGuide from './components/DeployGuide';
 import ProjectComposition from './components/ProjectComposition';
+import ApiImplementation from './components/ApiImplementation';
 import Documentation from './components/Documentation';
 import { Menu, X } from 'lucide-react';
 
@@ -500,13 +501,18 @@ find backups -name 'evidencias_*.dump' -mtime +14 -delete`} />
           <ProjectComposition />
         </Section>
 
-        {/* Section 10: Despliegue */}
-        <Section id="despliegue" number="10" title="Cómo desplegar el proyecto">
+        {/* Section 10: Implementación de la API */}
+        <Section id="api" number="10" title="Implementación de la API">
+          <ApiImplementation />
+        </Section>
+
+        {/* Section 11: Despliegue */}
+        <Section id="despliegue" number="11" title="Cómo desplegar el proyecto">
           <DeployGuide />
         </Section>
 
-        {/* Section 11: Documentación */}
-        <Section id="documentacion" number="11" title="README.md y notas de decisiones">
+        {/* Section 12: Documentación */}
+        <Section id="documentacion" number="12" title="README.md y notas de decisiones">
           <Documentation />
         </Section>
 
