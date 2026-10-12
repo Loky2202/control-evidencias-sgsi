@@ -12,6 +12,7 @@ import DeployGuide from './components/DeployGuide';
 import ProjectComposition from './components/ProjectComposition';
 import ApiImplementation from './components/ApiImplementation';
 import Documentation from './components/Documentation';
+import ProjectStatus from './components/ProjectStatus';
 import { Menu, X } from 'lucide-react';
 
 function App() {
@@ -64,6 +65,11 @@ function App() {
       {/* Main content */}
       <main className="lg:ml-72 px-4 sm:px-8 lg:px-12 pb-20">
         <Hero />
+
+        {/* Section 0: Estado del proyecto */}
+        <Section id="estado" number="0" title="Estado del proyecto">
+          <ProjectStatus />
+        </Section>
 
         {/* Section 1: Tecnología */}
         <Section id="tecnologia" number="1" title="Tecnología recomendada">

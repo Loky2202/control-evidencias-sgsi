@@ -8,6 +8,7 @@ interface SidebarProps {
 }
 
 const sections = [
+  { id: 'estado', label: 'Estado del proyecto', number: '0' },
   { id: 'tecnologia', label: 'Tecnología', number: '1' },
   { id: 'conexiones', label: 'Conexiones', number: '2' },
   { id: 'estructura', label: 'Estructura', number: '3' },
