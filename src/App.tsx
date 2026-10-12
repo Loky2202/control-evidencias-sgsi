@@ -13,6 +13,7 @@ import ProjectComposition from './components/ProjectComposition';
 import ApiImplementation from './components/ApiImplementation';
 import Documentation from './components/Documentation';
 import ProjectStatus from './components/ProjectStatus';
+import ProjectAudit from './components/ProjectAudit';
 import { Menu, X } from 'lucide-react';
 
 function App() {
@@ -69,6 +70,11 @@ function App() {
         {/* Section 0: Estado del proyecto */}
         <Section id="estado" number="0" title="Estado del proyecto">
           <ProjectStatus />
+        </Section>
+
+        {/* Section 0.5: Auditoría */}
+        <Section id="auditoria" number="0.5" title="Auditoría del proyecto">
+          <ProjectAudit />
         </Section>
 
         {/* Section 1: Tecnología */}
