@@ -33,7 +33,7 @@ psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" <<-EOSQL
     -- Mensaje de confirmación
     DO \$\$
     BEGIN
-        RA NOTICE 'Usuario ${DB_APP_USER} configurado exitosamente';
+        RAISE NOTICE 'Usuario ${DB_APP_USER} configurado exitosamente';
     END
     \$\$;
 EOSQL

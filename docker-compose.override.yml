@@ -1,5 +1,6 @@
 # Configuración de desarrollo
-# Este archivo NO debe subirse a producción
+# Este archivo NO debe usarse en producción
+# Solo activa AUTH_DISABLED=true para desarrollo local
 
 services:
   # API con recarga automática
@@ -8,6 +9,8 @@ services:
     volumes:
       - ./backend:/app
     environment:
+      # ⚠️ SOLO en desarrollo: deshabilita validación JWT real
+      # En producción este override NO se usa
       AUTH_DISABLED: "true"
       ENVIRONMENT: "development"
     ports:

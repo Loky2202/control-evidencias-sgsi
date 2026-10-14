@@ -1,6 +1,9 @@
 """
 Router del Tablero (Dashboard).
 Endpoint para obtener resumen de estados y cumplimiento.
+
+Seguridad:
+- GET: cualquier usuario autenticado (user, auditor, admin)
 """
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
@@ -10,14 +13,20 @@ from app.models.requirement import Requirement
 from app.models.policy import Policy
 from app.schemas.dashboard import DashboardResponse, StatusCount, PolicySummary
 from app.services.due_dates import calculate_requirement_status
+from app.auth.dependencies import get_current_user
 
 router = APIRouter()
 
 
 @router.get("/dashboard", response_model=DashboardResponse)
-def get_dashboard(db: Session = Depends(get_db)):
+def get_dashboard(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),  # Requiere autenticación
+):
     """
     Obtiene el tablero con resumen de estados y cumplimiento.
+    
+    Requiere: Cualquier usuario autenticado
     
     Returns:
         DashboardResponse: Resumen del estado de cumplimiento
