@@ -1,8 +1,13 @@
 """
 Router de Requisitos.
 Endpoints para listar requisitos con estado calculado.
+
+Seguridad:
+- Todos los endpoints requieren autenticación
+- GET: cualquier usuario autenticado
+- POST/PUT/DELETE: solo admin
 """
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from typing import Optional, List
 
@@ -10,6 +15,7 @@ from app.db import get_db
 from app.models.requirement import Requirement
 from app.schemas.requirement import RequirementWithStatus
 from app.services.due_dates import calculate_requirement_status
+from app.auth.dependencies import get_current_user, require_admin
 
 router = APIRouter()
 
@@ -17,11 +23,14 @@ router = APIRouter()
 @router.get("/requirements", response_model=List[RequirementWithStatus])
 def list_requirements(
     policy_code: Optional[str] = Query(None, description="Filtrar por política"),
-    status: Optional[str] = Query(None, description="Filtrar por estado"),
+    status_filter: Optional[str] = Query(None, alias="status", description="Filtrar por estado"),
     db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),  # Requiere autenticación
 ):
     """
     Lista todos los requisitos con su estado calculado.
+    
+    Requiere: Cualquier usuario autenticado
     
     Query Params:
         policy_code: Filtrar por código de política
@@ -49,7 +58,7 @@ def list_requirements(
         )
         
         # Filtrar por estado si se especificó
-        if status and req_with_status.alert_status != status:
+        if status_filter and req_with_status.alert_status != status_filter:
             continue
         
         result.append(req_with_status)
@@ -58,9 +67,15 @@ def list_requirements(
 
 
 @router.get("/requirements/{id}", response_model=RequirementWithStatus)
-def get_requirement(id: int, db: Session = Depends(get_db)):
+def get_requirement(
+    id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),  # Requiere autenticación
+):
     """
     Obtiene un requisito por ID con su estado calculado.
+    
+    Requiere: Cualquier usuario autenticado
     
     Args:
         id: ID del requisito
@@ -70,7 +85,10 @@ def get_requirement(id: int, db: Session = Depends(get_db)):
     """
     requirement = db.query(Requirement).filter(Requirement.id == id).first()
     if not requirement:
-        raise HTTPException(status_code=404, detail=f"Requisito {id} no encontrado")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Requisito {id} no encontrado"
+        )
     
     status_data = calculate_requirement_status(requirement.id, db)
     
@@ -80,3 +98,31 @@ def get_requirement(id: int, db: Session = Depends(get_db)):
         next_due_date=status_data["next_due_date"],
         alert_status=status_data["alert_status"],
     )
+
+
+@router.delete("/requirements/{id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_requirement(
+    id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_admin),  # Solo admin
+):
+    """
+    Elimina un requisito.
+    
+    Requiere: Rol admin
+    
+    Args:
+        id: ID del requisito
+    
+    Raises:
+        HTTPException: 404 si el requisito no existe
+    """
+    requirement = db.query(Requirement).filter(Requirement.id == id).first()
+    if not requirement:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Requisito {id} no encontrado"
+        )
+    
+    db.delete(requirement)
+    db.commit()

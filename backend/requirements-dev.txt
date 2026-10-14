@@ -1,0 +1,44 @@
+# ================================
+# Dependencias de desarrollo
+# ================================
+# Instalar con: pip install -r requirements-dev.txt
+# Estas dependencias NO se instalan en producción
+
+# Incluir dependencias de producción
+-r requirements.txt
+
+# ================================
+# Testing
+# ================================
+pytest==8.3.4
+pytest-asyncio==0.25.0
+pytest-cov==6.0.0
+httpx==0.28.1
+
+# ================================
+# Seguridad y Auditoría
+# ================================
+# Detectar vulnerabilidades en dependencias Python
+pip-audit==2.7.3
+# Safety: otra herramienta de auditoría
+safety==3.2.9
+
+# ================================
+# Desarrollo
+# ================================
+# Type checking
+mypy==1.14.1
+# Linting
+ruff==0.8.6
+# Formateo
+black==24.10.0
+# Import sorting
+isort==5.13.2
+
+# ================================
+# Debugging
+# ================================
+# Hot reload mejorado
+watchfiles==1.0.3
+# Debugger
+debugpy==1.8.11

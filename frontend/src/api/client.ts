@@ -1,44 +1,94 @@
 /**
  * Cliente API con TanStack Query
+ * 
+ * Seguridad:
+ * - Obtiene tokens usando el scope personalizado de la API
+ * - NO usa User.Read (scope de Microsoft Graph)
+ * - Incluye el token Bearer en cada request
+ * - Maneja refresh automático de tokens
  */
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { msalInstance } from '../auth/msalConfig';
+import { msalInstance, apiTokenRequest } from '../auth/msalConfig';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
-async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> {
+/**
+ * Obtiene un token de acceso para la API.
+ * Usa el scope personalizado (api://<client-id>/access).
+ */
+async function getAccessToken(): Promise<string> {
   const accounts = msalInstance.getAllAccounts();
+  
+  if (accounts.length === 0) {
+    throw new Error('No hay cuentas autenticadas');
+  }
+  
+  try {
+    // Intentar obtener token silenciosamente
+    const response = await msalInstance.acquireTokenSilent({
+      ...apiTokenRequest,
+      account: accounts[0],
+    });
+    return response.accessToken;
+  } catch (error) {
+    // Si falla, intentar con popup
+    console.warn('Token silencioso falló, intentando con popup...', error);
+    try {
+      const response = await msalInstance.acquireTokenPopup(apiTokenRequest);
+      return response.accessToken;
+    } catch (popupError) {
+      console.error('Error al obtener token:', popupError);
+      throw new Error('No se pudo obtener el token de acceso');
+    }
+  }
+}
+
+/**
+ * Realiza una petición a la API con autenticación.
+ */
+async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> {
   let token = '';
   
-  if (accounts.length > 0) {
-    try {
-      const response = await msalInstance.acquireTokenSilent({
-        scopes: ['User.Read'],
-        account: accounts[0],
-      });
-      token = response.accessToken;
-    } catch (error) {
-      console.error('Error acquiring token:', error);
-    }
+  try {
+    token = await getAccessToken();
+  } catch (error) {
+    // Si no hay token, redirigir a login
+    console.error('No se pudo obtener token, redirigiendo a login...');
+    throw new Error('Autenticación requerida');
   }
   
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
-      ...(token && { Authorization: `Bearer ${token}` }),
+      'Authorization': `Bearer ${token}`,
       ...options?.headers,
     },
   });
   
+  // Manejar errores de autenticación
+  if (response.status === 401) {
+    console.error('Token inválido o expirado');
+    throw new Error('Sesión expirada, por favor inicia sesión nuevamente');
+  }
+  
+  // Manejar errores de autorización
+  if (response.status === 403) {
+    throw new Error('No tienes permisos para realizar esta acción');
+  }
+  
   if (!response.ok) {
-    throw new Error(`API Error: ${response.status} ${response.statusText}`);
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.detail || `Error ${response.status}: ${response.statusText}`);
   }
   
   return response.json();
 }
 
+// ================================
 // Tipos
+// ================================
+
 export interface Policy {
   id: number;
   code: string;
@@ -98,7 +148,10 @@ export interface Dashboard {
   overall_compliance_rate: number;
 }
 
+// ================================
 // Hooks de queries
+// ================================
+
 export function usePolicies() {
   return useQuery({
     queryKey: ['policies'],
@@ -141,7 +194,10 @@ export function useSubmissions(requirementId?: number) {
   });
 }
 
+// ================================
 // Mutations
+// ================================
+
 export function useCreateSubmission() {
   const queryClient = useQueryClient();
   
@@ -150,6 +206,22 @@ export function useCreateSubmission() {
       fetchApi<Submission>('/submissions', {
         method: 'POST',
         body: JSON.stringify(data),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['submissions'] });
+      queryClient.invalidateQueries({ queryKey: ['requirements'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+  });
+}
+
+export function useDeleteSubmission() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: (id: number) =>
+      fetchApi<void>(`/submissions/${id}`, {
+        method: 'DELETE',
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['submissions'] });

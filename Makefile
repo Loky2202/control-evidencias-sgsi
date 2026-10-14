@@ -121,6 +121,34 @@ docs: ## Abrir documentación de la API
 	@echo "$(GREEN)📖 Abriendo documentación en: http://localhost/api/docs$(NC)"
 	@open http://localhost/api/docs 2>/dev/null || xdg-open http://localhost/api/docs 2>/dev/null || echo "Abre manualmente: http://localhost/api/docs"
 
+# Seguridad y Auditoría
+audit: ## Ejecutar auditorías de seguridad (pip-audit + npm audit)
+	@echo "$(YELLOW)🔍 Ejecutando auditorías de seguridad...$(NC)"
+	@echo ""
+	@echo "$(GREEN)📦 Backend (pip-audit):$(NC)"
+	@$(DOCKER_COMPOSE) exec api pip-audit || echo "⚠️ pip-audit no disponible, instálalo con: pip install pip-audit"
+	@echo ""
+	@echo "$(GREEN)📦 Frontend (npm audit):$(NC)"
+	@cd $(FRONTEND_DIR) && npm audit || true
+
+audit-fix: ## Intentar corregir vulnerabilidades automáticamente
+	@echo "$(YELLOW)🔧 Intentando corregir vulnerabilidades...$(NC)"
+	@echo ""
+	@echo "$(GREEN)📦 Frontend (npm audit fix):$(NC)"
+	@cd $(FRONTEND_DIR) && npm audit fix || true
+
+security-check: ## Verificación completa de seguridad
+	@echo "$(YELLOW)🛡️  Verificación completa de seguridad...$(NC)"
+	@echo ""
+	@echo "1. Auditoría de dependencias Python:"
+	@$(DOCKER_COMPOSE) exec api pip-audit --desc || true
+	@echo ""
+	@echo "2. Auditoría de dependencias Node.js:"
+	@cd $(FRONTEND_DIR) && npm audit --audit-level=moderate || true
+	@echo ""
+	@echo "3. Verificar que AUTH_DISABLED=false en producción:"
+	@grep -q "AUTH_DISABLED=true" .env && echo "⚠️  WARNING: AUTH_DISABLED=true en .env" || echo "✅ AUTH_DISABLED no está en true"
+
 # Estado
 status: ## Ver estado completo del proyecto
 	@echo "$(GREEN)📊 Estado del proyecto:$(NC)"

@@ -286,6 +286,17 @@ export default function ProjectStatus() {
             </ul>
           </div>
           <div className="bg-white/10 rounded-lg p-4">
+            <h4 className="font-semibold text-emerald-200 mb-2">🔒 Seguridad (Fase 2)</h4>
+            <ul className="space-y-1 text-emerald-100">
+              <li>• JWT validado con PyJWT + JWKS</li>
+              <li>• Scope propio (api://client/access)</li>
+              <li>• Auth en todos los endpoints</li>
+              <li>• Roles: admin/auditor/user</li>
+              <li>• Docs deshabilitados en prod</li>
+              <li>• Separación dev/prod deps</li>
+            </ul>
+          </div>
+          <div className="bg-white/10 rounded-lg p-4">
             <h4 className="font-semibold text-emerald-200 mb-2">⚡ Backend API</h4>
             <ul className="space-y-1 text-emerald-100">
               <li>• FastAPI con 9 endpoints</li>
