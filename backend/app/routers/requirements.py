@@ -13,7 +13,9 @@ from typing import Optional, List
 
 from app.db import get_db
 from app.models.requirement import Requirement
-from app.schemas.requirement import RequirementWithStatus
+from app.models.policy import Policy
+from app.models.control import Control
+from app.schemas.requirement import RequirementCreate, RequirementUpdate, RequirementWithStatus
 from app.services.due_dates import calculate_requirement_status
 from app.auth.dependencies import get_current_user, require_admin
 
@@ -92,6 +94,71 @@ def get_requirement(
     
     status_data = calculate_requirement_status(requirement.id, db)
     
+    return RequirementWithStatus(
+        **requirement.__dict__,
+        last_evidence_date=status_data["last_evidence_date"],
+        next_due_date=status_data["next_due_date"],
+        alert_status=status_data["alert_status"],
+    )
+
+
+@router.post("/requirements", response_model=RequirementWithStatus, status_code=201)
+def create_requirement(
+    requirement_data: RequirementCreate,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_admin),
+):
+    """Crea un nuevo requisito. Solo admin."""
+    # Verificar que no exista
+    existing = db.query(Requirement).filter(Requirement.code == requirement_data.code).first()
+    if existing:
+        raise HTTPException(status_code=409, detail=f"El requisito {requirement_data.code} ya existe")
+    
+    # Verificar que la política exista
+    policy = db.query(Policy).filter(Policy.code == requirement_data.policy_code).first()
+    if not policy:
+        raise HTTPException(status_code=400, detail=f"La política {requirement_data.policy_code} no existe")
+    
+    # Verificar que el control exista si se especificó
+    if requirement_data.control_id:
+        control = db.query(Control).filter(Control.id == requirement_data.control_id).first()
+        if not control:
+            raise HTTPException(status_code=400, detail=f"El control {requirement_data.control_id} no existe")
+    
+    new_requirement = Requirement(**requirement_data.model_dump())
+    db.add(new_requirement)
+    db.commit()
+    db.refresh(new_requirement)
+    
+    status_data = calculate_requirement_status(new_requirement.id, db)
+    return RequirementWithStatus(
+        **new_requirement.__dict__,
+        last_evidence_date=status_data["last_evidence_date"],
+        next_due_date=status_data["next_due_date"],
+        alert_status=status_data["alert_status"],
+    )
+
+
+@router.put("/requirements/{id}", response_model=RequirementWithStatus)
+def update_requirement(
+    id: int,
+    requirement_update: RequirementUpdate,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_admin),
+):
+    """Actualiza un requisito. Solo admin."""
+    requirement = db.query(Requirement).filter(Requirement.id == id).first()
+    if not requirement:
+        raise HTTPException(status_code=404, detail=f"Requisito {id} no encontrado")
+    
+    update_data = requirement_update.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(requirement, field, value)
+    
+    db.commit()
+    db.refresh(requirement)
+    
+    status_data = calculate_requirement_status(requirement.id, db)
     return RequirementWithStatus(
         **requirement.__dict__,
         last_evidence_date=status_data["last_evidence_date"],

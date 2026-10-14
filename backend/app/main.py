@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import settings
-from app.routers import policies, requirements, submissions, dashboard
+from app.routers import policies, requirements, submissions, dashboard, controls, soa
 
 # Configurar logging
 logging.basicConfig(
@@ -109,8 +109,10 @@ async def global_exception_handler(request: Request, exc: Exception):
 # Todos los endpoints requieren autenticación
 app.include_router(policies.router, prefix="/api", tags=["policies"])
 app.include_router(requirements.router, prefix="/api", tags=["requirements"])
+app.include_router(controls.router, prefix="/api", tags=["controls"])
 app.include_router(submissions.router, prefix="/api", tags=["submissions"])
 app.include_router(dashboard.router, prefix="/api", tags=["dashboard"])
+app.include_router(soa.router, prefix="/api", tags=["soa"])
 
 
 @app.get("/api/health")

@@ -15,6 +15,21 @@ class RequirementBase(BaseModel):
     control_id: Optional[int] = None
 
 
+class RequirementCreate(RequirementBase):
+    """Schema para crear un requisito"""
+    pass
+
+
+class RequirementUpdate(BaseModel):
+    """Schema para actualizar un requisito (todos los campos opcionales)"""
+    code: Optional[str] = Field(None, max_length=20)
+    title: Optional[str] = Field(None, max_length=200)
+    description: Optional[str] = None
+    frequency: Optional[str] = None
+    policy_code: Optional[str] = None
+    control_id: Optional[int] = None
+
+
 class RequirementResponse(RequirementBase):
     """Schema de respuesta de un requisito"""
     id: int

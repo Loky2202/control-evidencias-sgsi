@@ -230,3 +230,102 @@ export function useDeleteSubmission() {
     },
   });
 }
+
+// Actualizar estado de entrega (aprobar/rechazar)
+export function useUpdateSubmissionStatus() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: ({ id, status, notes }: { id: number; status: string; notes?: string }) =>
+      fetchApi<Submission>(`/submissions/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status, notes }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['submissions'] });
+      queryClient.invalidateQueries({ queryKey: ['requirements'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+  });
+}
+
+// Subir adjunto a una entrega
+export function useUploadAttachment() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ submissionId, file }: { submissionId: number; file: File }) => {
+      const token = await getAccessToken();
+      
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const response = await fetch(`${API_BASE_URL}/submissions/${submissionId}/attachments`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || 'Error al subir archivo');
+      }
+      
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['submissions'] });
+    },
+  });
+}
+
+// SoA (Statement of Applicability)
+export interface SoAItem {
+  control_id: number;
+  control_code: string;
+  control_title: string;
+  control_category: string;
+  is_applicable: boolean;
+  justification: string;
+  implementation_status: string;
+  requirements_count: number;
+  compliant_requirements: number;
+  compliance_rate: number;
+}
+
+export interface SoAResponse {
+  total_controls: number;
+  applicable_controls: number;
+  items: SoAItem[];
+  overall_compliance_rate: number;
+}
+
+export function useSoA() {
+  return useQuery({
+    queryKey: ['soa'],
+    queryFn: () => fetchApi<SoAResponse>('/soa'),
+  });
+}
+
+// Controls CRUD
+export interface Control {
+  id: number;
+  code: string;
+  title: string;
+  description?: string;
+  category?: string;
+  created_at: string;
+  updated_at?: string;
+}
+
+export function useControls(category?: string) {
+  return useQuery({
+    queryKey: ['controls', category],
+    queryFn: () => {
+      const params = category ? `?category=${category}` : '';
+      return fetchApi<Control[]>(`/controls${params}`);
+    },
+  });
+}

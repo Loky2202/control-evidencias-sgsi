@@ -13,7 +13,7 @@ from typing import List
 
 from app.db import get_db
 from app.models.policy import Policy
-from app.schemas.policy import PolicyCreate, PolicyResponse, PolicyList
+from app.schemas.policy import PolicyCreate, PolicyUpdate, PolicyResponse, PolicyList
 from app.auth.dependencies import get_current_user, require_admin
 
 router = APIRouter()
@@ -93,6 +93,41 @@ def create_policy(
     db.refresh(new_policy)
     
     return new_policy
+
+
+@router.put("/policies/{code}", response_model=PolicyResponse)
+def update_policy(
+    code: str,
+    policy_update: PolicyUpdate,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_admin),  # Solo admin
+):
+    """
+    Actualiza una política existente.
+    
+    Requiere: Rol admin
+    
+    Args:
+        code: Código de la política
+        policy_update: Campos a actualizar
+    
+    Returns:
+        PolicyResponse: Política actualizada
+    """
+    policy = db.query(Policy).filter(Policy.code == code).first()
+    if not policy:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Política {code} no encontrada"
+        )
+    
+    update_data = policy_update.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(policy, field, value)
+    
+    db.commit()
+    db.refresh(policy)
+    return policy
 
 
 @router.delete("/policies/{code}", status_code=status.HTTP_204_NO_CONTENT)

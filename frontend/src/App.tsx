@@ -22,6 +22,8 @@ import Policies from './pages/Policies';
 import Requirements from './pages/Requirements';
 import CalendarPage from './pages/Calendar';
 import Auditor from './pages/Auditor';
+import SoA from './pages/SoA';
+import NewSubmission from './pages/NewSubmission';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -32,13 +34,15 @@ const queryClient = new QueryClient({
   },
 });
 
-type Page = 'dashboard' | 'policies' | 'requirements' | 'calendar' | 'auditor';
+type Page = 'dashboard' | 'policies' | 'requirements' | 'calendar' | 'auditor' | 'soa' | 'new-submission';
 
 const navItems = [
   { id: 'dashboard' as Page, label: 'Tablero', icon: LayoutDashboard },
   { id: 'policies' as Page, label: 'Políticas', icon: FileText },
   { id: 'requirements' as Page, label: 'Requisitos', icon: ListChecks },
   { id: 'calendar' as Page, label: 'Calendario', icon: Calendar },
+  { id: 'soa' as Page, label: 'SoA', icon: Shield },
+  { id: 'new-submission' as Page, label: 'Nueva Entrega', icon: FileText },
   { id: 'auditor' as Page, label: 'Auditor', icon: Shield },
 ];
 
@@ -85,6 +89,10 @@ export default function App() {
         return <CalendarPage />;
       case 'auditor':
         return <Auditor />;
+      case 'soa':
+        return <SoA />;
+      case 'new-submission':
+        return <NewSubmission />;
       default:
         return <Dashboard />;
     }
