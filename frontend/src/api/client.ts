@@ -16,7 +16,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
  * Obtiene un token de acceso para la API.
  * Usa el scope personalizado (api://<client-id>/access).
  */
-async function getAccessToken(): Promise<string> {
+export async function getAccessToken(): Promise<string> {
   const accounts = msalInstance.getAllAccounts();
   
   if (accounts.length === 0) {

@@ -4,7 +4,7 @@ Obtiene las claves públicas de Microsoft Entra ID y las cachea.
 """
 import time
 import logging
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Union
 from threading import Lock
 
 import httpx
@@ -87,7 +87,7 @@ class JWKSManager:
     def decode_token(
         self,
         token: str,
-        audience: str,
+        audience: Union[str, list[str]],
         issuer: str,
         algorithms: list[str] = None,
     ) -> Dict[str, Any]:
@@ -96,7 +96,7 @@ class JWKSManager:
         
         Args:
             token: Token JWT a validar
-            audience: Audience esperado
+            audience: Audience esperado (string o lista de strings)
             issuer: Issuer esperado
             algorithms: Algoritmos permitidos (default: ["RS256"])
         

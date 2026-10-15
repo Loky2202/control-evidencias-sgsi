@@ -26,23 +26,13 @@ security = HTTPBearer(auto_error=False)
 # Roles válidos en el sistema
 VALID_ROLES = {"admin", "auditor", "user"}
 
-# Mapeo de grupos de Azure AD a roles de la aplicación
-# Configurar en .env: AZURE_AD_GROUP_ADMIN, AZURE_AD_GROUP_AUDITOR, etc.
-ROLE_GROUP_MAPPING = {
-    "admin": "Evidencias-ISO-Admin",
-    "auditor": "Evidencias-ISO-Auditor",
-    "user": "Evidencias-ISO-User",
-}
-
 
 def _extract_roles_from_token(decoded: dict) -> str:
     """
     Extrae el rol del usuario desde el token JWT.
     
-    Estrategias (en orden de prioridad):
-    1. Claim 'roles' (roles de aplicación registrados en Azure AD)
-    2. Claim 'groups' (grupos de Azure AD mapeados a roles)
-    3. Default: 'user'
+    Usa el claim 'roles' que contiene los App Roles asignados en Azure AD.
+    Los roles deben estar creados como App Roles en la App Registration.
     
     Args:
         decoded: Claims del token decodificado
@@ -50,23 +40,12 @@ def _extract_roles_from_token(decoded: dict) -> str:
     Returns:
         str: Rol del usuario ('admin', 'auditor', 'user')
     """
-    # Estrategia 1: Claim 'roles'
+    # Extraer rol del claim 'roles'
     roles = decoded.get("roles", [])
     if isinstance(roles, list):
         for role in roles:
             if role.lower() in VALID_ROLES:
                 return role.lower()
-    
-    # Estrategia 2: Claim 'groups' (IDs de grupos de Azure AD)
-    groups = decoded.get("groups", [])
-    if isinstance(groups, list):
-        # Aquí se pueden mapear Object IDs de grupos a roles
-        # Por ahora, buscamos nombres de grupos si están en el token
-        for group in groups:
-            if isinstance(group, str):
-                for role, group_name in ROLE_GROUP_MAPPING.items():
-                    if group_name.lower() in group.lower():
-                        return role
     
     # Default: usuario regular
     return "user"
@@ -156,7 +135,7 @@ async def get_current_user(
         jwks_manager = get_jwks_manager()
         decoded = jwks_manager.decode_token(
             token=token,
-            audience=settings.audience,
+            audience=settings.audiences,
             issuer=settings.issuer,
         )
         

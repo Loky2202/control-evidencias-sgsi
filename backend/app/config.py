@@ -43,6 +43,15 @@ class Settings(BaseSettings):
         """Verifica si estamos en producción"""
         return self.ENVIRONMENT.lower() == "production"
     
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # Bloquear AUTH_DISABLED en producción
+        if self.is_production and self.AUTH_DISABLED:
+            raise RuntimeError(
+                "AUTH_DISABLED no puede ser true en producción. "
+                "Esto es un riesgo de seguridad crítico."
+            )
+    
     @property
     def cors_origins_list(self) -> list[str]:
         """Convierte CORS_ORIGINS a lista"""
@@ -63,11 +72,11 @@ class Settings(BaseSettings):
         return f"https://login.microsoftonline.com/{self.ENTRA_TENANT_ID}/v2.0"
     
     @property
-    def audience(self) -> str:
-        """Audience esperado en los tokens JWT"""
+    def audiences(self) -> list[str]:
+        """Audiencias aceptadas en los tokens JWT (v1 y v2)"""
         if not self.ENTRA_CLIENT_ID:
             raise ValueError("ENTRA_CLIENT_ID no configurado")
-        return f"api://{self.ENTRA_CLIENT_ID}"
+        return [self.ENTRA_CLIENT_ID, f"api://{self.ENTRA_CLIENT_ID}"]
     
     class Config:
         env_file = ".env"
