@@ -329,3 +329,44 @@ export function useControls(category?: string) {
     },
   });
 }
+
+// API Client para uso directo (ej. en Retention page)
+export const apiClient = {
+  get: async (endpoint: string, options?: RequestInit) => {
+    const token = await getAccessToken();
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        ...options?.headers,
+      },
+      ...options,
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Error ${response.status}: ${response.statusText}`);
+    }
+    
+    return response;
+  },
+  
+  post: async (endpoint: string, options?: RequestInit) => {
+    const token = await getAccessToken();
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        ...options?.headers,
+      },
+      ...options,
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Error ${response.status}: ${response.statusText}`);
+    }
+    
+    return response.json();
+  },
+};

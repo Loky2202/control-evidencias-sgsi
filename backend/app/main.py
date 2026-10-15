@@ -15,7 +15,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import settings
-from app.routers import policies, requirements, submissions, dashboard, controls, soa
+from app.routers import policies, requirements, submissions, dashboard, controls, soa, reports
+from app.middleware.audit import AuditMiddleware
 
 # Configurar logging
 logging.basicConfig(
@@ -85,6 +86,11 @@ async def add_security_headers(request: Request, call_next):
     return response
 
 
+# Middleware de auditoría (registra logins, descargas, errores de auth)
+app.add_middleware(AuditMiddleware)
+logger.info("Middleware de auditoría habilitado")
+
+
 # Manejo global de errores
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
@@ -113,6 +119,7 @@ app.include_router(controls.router, prefix="/api", tags=["controls"])
 app.include_router(submissions.router, prefix="/api", tags=["submissions"])
 app.include_router(dashboard.router, prefix="/api", tags=["dashboard"])
 app.include_router(soa.router, prefix="/api", tags=["soa"])
+app.include_router(reports.router, prefix="/api", tags=["reports"])
 
 
 @app.get("/api/health")
