@@ -2,7 +2,7 @@
 Schemas para Entregas de Evidencia.
 """
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional, List, Literal
 from datetime import datetime, date
 
 
@@ -42,3 +42,9 @@ class SubmissionResponse(SubmissionBase):
     
     class Config:
         from_attributes = True
+
+
+class SubmissionReview(BaseModel):
+    """Schema para aprobar/rechazar una entrega"""
+    status: Literal["Completa", "Rechazada"]
+    notes: Optional[str] = Field(None, max_length=2000)

@@ -28,6 +28,7 @@ services:
     command: alembic upgrade head
     environment:
       DATABASE_URL: postgresql+psycopg://${DB_OWNER}:${DB_OWNER_PASSWORD}@db:5432/${DB_NAME}
+      DB_APP_USER: ${DB_APP_USER}
     depends_on:
       db:
         condition: service_healthy

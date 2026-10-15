@@ -136,7 +136,7 @@ async def export_audit_log_excel(
 @router.get("/reports/submissions/excel")
 async def export_submissions_excel(
     policy_code: Optional[str] = Query(None, description="Filtrar por política"),
-    status: Optional[str] = Query(None, description="Filtrar por estado"),
+    status_filter: Optional[str] = Query(None, alias="status", description="Filtrar por estado"),
     request: Request = None,
     db: Session = Depends(get_db),
     current_user: dict = Depends(require_auditor),
@@ -154,8 +154,8 @@ async def export_submissions_excel(
     
     if policy_code:
         query = query.filter(Requirement.policy_code == policy_code)
-    if status:
-        query = query.filter(Submission.status == status)
+    if status_filter:
+        query = query.filter(Submission.status == status_filter)
     
     submissions = query.order_by(Submission.evidence_date.desc()).all()
     

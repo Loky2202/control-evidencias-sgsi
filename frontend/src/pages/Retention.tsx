@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Calendar, AlertTriangle, Trash2, Download, RefreshCw } from 'lucide-react';
-import { apiClient } from '../api/client';
+import { getAccessToken } from '../api/client';
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 interface RetentionSummary {
   policy: {
@@ -49,8 +51,20 @@ export default function Retention() {
   const loadSummary = async () => {
     try {
       setLoading(true);
-      const response = await apiClient.get('/reports/retention/summary');
-      setSummary(response.data);
+      const token = await getAccessToken();
+      const response = await fetch(`${API_BASE_URL}/reports/retention/summary`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      setSummary(data);
     } catch (error) {
       console.error('Error loading retention summary:', error);
     } finally {
@@ -63,10 +77,24 @@ export default function Retention() {
       setCleaning(true);
       setCleanupResult(null);
       
-      const response = await apiClient.post(
-        `/reports/retention/cleanup?dry_run=${dryRun}`
+      const token = await getAccessToken();
+      const response = await fetch(
+        `${API_BASE_URL}/reports/retention/cleanup?dry_run=${dryRun}`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
       );
-      setCleanupResult(response.data);
+      
+      if (!response.ok) {
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      setCleanupResult(data);
       
       // Recargar resumen después de la limpieza
       await loadSummary();
@@ -80,18 +108,27 @@ export default function Retention() {
 
   const exportAuditLog = async (format: 'excel' | 'pdf') => {
     try {
+      const token = await getAccessToken();
       const endpoint = format === 'excel' ? 'excel' : 'pdf';
-      const response = await apiClient.get(`/reports/audit-log/${endpoint}`, {
-        responseType: 'blob',
+      const response = await fetch(`${API_BASE_URL}/reports/audit-log/${endpoint}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
       });
       
-      const url = window.URL.createObjectURL(new Blob([response.data]));
+      if (!response.ok) {
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
       link.setAttribute('download', `audit_log.${format === 'excel' ? 'xlsx' : 'pdf'}`);
       document.body.appendChild(link);
       link.click();
       link.remove();
+      window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Error exporting audit log:', error);
       alert('Error al exportar el log de auditoría.');

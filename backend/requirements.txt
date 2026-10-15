@@ -4,6 +4,7 @@
 fastapi==0.115.6
 uvicorn[standard]==0.34.0
 python-multipart==0.0.18
+starlette==0.45.1
 
 # ================================
 # Database
@@ -23,6 +24,7 @@ pydantic-settings==2.7.0
 # ================================
 # PyJWT con soporte criptográfico para validación JWKS
 PyJWT[crypto]==2.10.1
+cryptography==44.0.0
 # MSAL para integración con Microsoft Graph
 msal==1.31.1
 # HTTP client para JWKS y Graph API

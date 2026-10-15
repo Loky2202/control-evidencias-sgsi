@@ -8,14 +8,14 @@ Seguridad:
 - PUT/PATCH: user, admin (dueño de la entrega o admin)
 - DELETE: solo admin
 """
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, Request
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, Request, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 
 from app.db import get_db
 from app.models.submission import Submission
 from app.models.requirement import Requirement
-from app.schemas.submission import SubmissionCreate, SubmissionResponse
+from app.schemas.submission import SubmissionCreate, SubmissionResponse, SubmissionReview
 from app.services.audit import log_action, get_request_context
 from app.auth.dependencies import get_current_user, require_role
 
@@ -159,7 +159,7 @@ def list_submissions(
 @router.patch("/submissions/{id}", response_model=SubmissionResponse)
 def update_submission_status(
     id: int,
-    status_update: dict,  # {"status": "Completa" | "Rechazada", "notes": "..."}
+    review: SubmissionReview,
     request: Request,
     db: Session = Depends(get_db),
     current_user: dict = Depends(require_role("auditor", "admin")),  # Solo auditor/admin
@@ -169,15 +169,19 @@ def update_submission_status(
     
     Requiere: Rol 'auditor' o 'admin'
     
+    Reglas:
+    - Solo se puede revisar si la entrega está en estado "Pendiente"
+    - El creador de la entrega NO puede aprobarla (conflicto de interés)
+    
     Args:
         id: ID de la entrega
-        status_update: Dict con 'status' y opcionalmente 'notes'
+        review: Schema con status ("Completa" o "Rechazada") y notas
     
     Returns:
         SubmissionResponse: Entrega actualizada
     
     Raises:
-        HTTPException: 404 si no existe, 400 si status inválido
+        HTTPException: 404 si no existe, 409 si no está pendiente, 403 si es el creador
     """
     submission = db.query(Submission).filter(Submission.id == id).first()
     if not submission:
@@ -186,18 +190,25 @@ def update_submission_status(
             detail=f"Entrega {id} no encontrada"
         )
     
-    new_status = status_update.get("status")
-    if new_status not in ["Completa", "Rechazada"]:
+    # Solo se puede revisar si está pendiente
+    if submission.status != "Pendiente":
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="El estado debe ser 'Completa' o 'Rechazada'"
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"La entrega ya fue revisada (estado actual: {submission.status})"
+        )
+    
+    # El creador no puede aprobar su propia entrega
+    if submission.created_by == current_user["email"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No puedes aprobar tu propia entrega (conflicto de interés)"
         )
     
     old_status = submission.status
-    submission.status = new_status
+    submission.status = review.status
     
-    if "notes" in status_update:
-        submission.notes = status_update["notes"]
+    if review.notes:
+        submission.notes = review.notes
     
     # Obtener contexto de request para auditoría
     context = get_request_context(request)
@@ -208,7 +219,7 @@ def update_submission_status(
         action="update",
         resource_type="submission",
         resource_id=submission.id,
-        description=f"Entrega {old_status} → {new_status}",
+        description=f"Entrega {old_status} → {review.status}",
         user_email=current_user["email"],
         user_role=current_user.get("role", "auditor"),
         ip_address=context["ip_address"],
@@ -257,20 +268,38 @@ async def upload_attachment(
             detail=f"Entrega {id} no encontrada"
         )
     
-    # Validar tipo de archivo
-    allowed_types = ["application/pdf", "image/png", "image/jpeg", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"]
-    if file.content_type not in allowed_types:
+    # Constantes de validación
+    MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
+    
+    # Magic numbers para validar tipo de archivo por contenido
+    MAGIC_NUMBERS = {
+        b'%PDF-': 'application/pdf',
+        b'\x89PNG': 'image/png',
+        b'\xff\xd8\xff': 'image/jpeg',
+        b'PK\x03\x04': 'application/zip',  # XLSX, DOCX son ZIP
+    }
+    
+    # Leer con límite para evitar DoS
+    content = await file.read(MAX_FILE_SIZE + 1)
+    
+    # Validar tamaño
+    if len(content) > MAX_FILE_SIZE:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Tipo de archivo no permitido: {file.content_type}. Permitidos: PDF, PNG, JPG, XLSX, DOCX"
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"El archivo no puede superar los {MAX_FILE_SIZE // (1024*1024)}MB"
         )
     
-    # Validar tamaño (máximo 10MB)
-    content = await file.read()
-    if len(content) > 10 * 1024 * 1024:
+    # Validar tipo por magic numbers (más seguro que content_type)
+    file_type = None
+    for magic, mime in MAGIC_NUMBERS.items():
+        if content.startswith(magic):
+            file_type = mime
+            break
+    
+    if not file_type:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="El archivo no puede superar los 10MB"
+            detail="Tipo de archivo no reconocido. Permitidos: PDF, PNG, JPG, XLSX, DOCX"
         )
     
     # Subir a SharePoint

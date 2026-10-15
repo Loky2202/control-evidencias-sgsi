@@ -2,7 +2,7 @@
  * Página de Tablero (Dashboard)
  * Muestra resumen de cumplimiento con gráficos
  */
-import { useDashboard, usePolicies } from '../api/client';
+import { useDashboard } from '../api/client';
 import {
   CheckCircle2,
   AlertCircle,
@@ -14,7 +14,6 @@ import {
 
 export default function Dashboard() {
   const { data: dashboard, isLoading, error } = useDashboard();
-  const { data: policiesData } = usePolicies();
 
   if (isLoading) {
     return (
