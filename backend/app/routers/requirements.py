@@ -16,7 +16,7 @@ from app.models.requirement import Requirement
 from app.models.policy import Policy
 from app.models.control import Control
 from app.schemas.requirement import RequirementCreate, RequirementUpdate, RequirementWithStatus
-from app.services.due_dates import calculate_requirement_status
+from app.services.due_dates import calculate_requirement_status, calculate_requirements_status_batch
 from app.auth.dependencies import get_current_user, require_admin
 
 router = APIRouter()
@@ -48,10 +48,17 @@ def list_requirements(
     
     requirements = query.order_by(Requirement.code).all()
     
-    # Calcular estado de cada requisito
+    # OPTIMIZACIÓN: Calcular estados en batch (evita N+1)
+    requirement_ids = [req.id for req in requirements]
+    status_map = calculate_requirements_status_batch(requirement_ids, db)
+    
     result = []
     for req in requirements:
-        status_data = calculate_requirement_status(req.id, db)
+        status_data = status_map.get(req.id, {
+            "last_evidence_date": None,
+            "next_due_date": None,
+            "alert_status": "Pendiente",
+        })
         req_with_status = RequirementWithStatus(
             **req.__dict__,
             last_evidence_date=status_data["last_evidence_date"],

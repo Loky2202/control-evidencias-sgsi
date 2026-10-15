@@ -8,7 +8,7 @@ Seguridad:
 - PUT/PATCH: user, admin (dueño de la entrega o admin)
 - DELETE: solo admin
 """
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, Request
 from sqlalchemy.orm import Session
 from typing import List, Optional
 
@@ -16,7 +16,7 @@ from app.db import get_db
 from app.models.submission import Submission
 from app.models.requirement import Requirement
 from app.schemas.submission import SubmissionCreate, SubmissionResponse
-from app.services.audit import log_action
+from app.services.audit import log_action, get_request_context
 from app.auth.dependencies import get_current_user, require_role
 
 router = APIRouter()
@@ -25,6 +25,7 @@ router = APIRouter()
 @router.post("/submissions", response_model=SubmissionResponse, status_code=status.HTTP_201_CREATED)
 def create_submission(
     submission: SubmissionCreate,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: dict = Depends(require_role("user", "admin")),  # NO auditor
 ):
@@ -60,10 +61,11 @@ def create_submission(
     )
     
     db.add(new_submission)
-    db.commit()
-    db.refresh(new_submission)
     
-    # Registrar en auditoría
+    # Obtener contexto de request para auditoría
+    context = get_request_context(request)
+    
+    # Registrar en auditoría (atómico - mismo commit)
     log_action(
         db=db,
         action="create",
@@ -72,7 +74,13 @@ def create_submission(
         description=f"Entrega creada para requisito {requirement.code}",
         user_email=current_user["email"],
         user_role=current_user.get("role", "user"),
+        ip_address=context["ip_address"],
+        user_agent=context["user_agent"],
     )
+    
+    # Commit atómico: submission + audit_log
+    db.commit()
+    db.refresh(new_submission)
     
     return new_submission
 
@@ -103,31 +111,56 @@ def get_submission(
     return submission
 
 
-@router.get("/submissions", response_model=List[SubmissionResponse])
+@router.get("/submissions")
 def list_submissions(
     requirement_id: Optional[int] = None,
+    skip: int = Query(0, ge=0, description="Número de registros a saltar"),
+    limit: int = Query(100, ge=1, le=1000, description="Número máximo de registros a retornar"),
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),  # Requiere autenticación
 ):
     """
-    Lista entregas, opcionalmente filtradas por requisito.
+    Lista entregas con paginación, opcionalmente filtradas por requisito.
     
     Requiere: Cualquier usuario autenticado
     
     Query Params:
         requirement_id: Filtrar por ID de requisito
+        skip: Número de registros a saltar (default: 0)
+        limit: Número máximo de registros (default: 100, max: 1000)
+    
+    Returns:
+        Dict con 'items', 'total', 'skip', 'limit'
     """
     query = db.query(Submission)
     if requirement_id:
         query = query.filter(Submission.requirement_id == requirement_id)
     
-    return query.order_by(Submission.evidence_date.desc()).all()
+    # Contar total antes de aplicar paginación
+    total = query.count()
+    
+    # Aplicar paginación
+    items = (
+        query
+        .order_by(Submission.evidence_date.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+    
+    return {
+        "items": items,
+        "total": total,
+        "skip": skip,
+        "limit": limit,
+    }
 
 
 @router.patch("/submissions/{id}", response_model=SubmissionResponse)
 def update_submission_status(
     id: int,
     status_update: dict,  # {"status": "Completa" | "Rechazada", "notes": "..."}
+    request: Request,
     db: Session = Depends(get_db),
     current_user: dict = Depends(require_role("auditor", "admin")),  # Solo auditor/admin
 ):
@@ -166,10 +199,10 @@ def update_submission_status(
     if "notes" in status_update:
         submission.notes = status_update["notes"]
     
-    db.commit()
-    db.refresh(submission)
+    # Obtener contexto de request para auditoría
+    context = get_request_context(request)
     
-    # Registrar en auditoría
+    # Registrar en auditoría (atómico - mismo commit)
     log_action(
         db=db,
         action="update",
@@ -178,7 +211,13 @@ def update_submission_status(
         description=f"Entrega {old_status} → {new_status}",
         user_email=current_user["email"],
         user_role=current_user.get("role", "auditor"),
+        ip_address=context["ip_address"],
+        user_agent=context["user_agent"],
     )
+    
+    # Commit atómico: submission + audit_log
+    db.commit()
+    db.refresh(submission)
     
     return submission
 
@@ -187,6 +226,7 @@ def update_submission_status(
 async def upload_attachment(
     id: int,
     file: UploadFile,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: dict = Depends(require_role("user", "admin")),
 ):
@@ -258,10 +298,11 @@ async def upload_attachment(
     )
     
     db.add(attachment)
-    db.commit()
-    db.refresh(attachment)
     
-    # Registrar en auditoría
+    # Obtener contexto de request para auditoría
+    context = get_request_context(request)
+    
+    # Registrar en auditoría (atómico - mismo commit)
     log_action(
         db=db,
         action="create",
@@ -270,7 +311,13 @@ async def upload_attachment(
         description=f"Archivo subido: {file.filename}",
         user_email=current_user["email"],
         user_role=current_user.get("role", "user"),
+        ip_address=context["ip_address"],
+        user_agent=context["user_agent"],
     )
+    
+    # Commit atómico: attachment + audit_log
+    db.commit()
+    db.refresh(attachment)
     
     return {
         "id": attachment.id,
@@ -284,6 +331,7 @@ async def upload_attachment(
 @router.delete("/submissions/{id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_submission(
     id: int,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: dict = Depends(require_role("admin")),  # Solo admin
 ):
@@ -305,7 +353,10 @@ def delete_submission(
             detail=f"Entrega {id} no encontrada"
         )
     
-    # Registrar en auditoría antes de eliminar
+    # Obtener contexto de request para auditoría
+    context = get_request_context(request)
+    
+    # Registrar en auditoría antes de eliminar (atómico - mismo commit)
     log_action(
         db=db,
         action="delete",
@@ -314,7 +365,11 @@ def delete_submission(
         description=f"Entrega eliminada (requisito {submission.requirement_id})",
         user_email=current_user["email"],
         user_role=current_user.get("role", "admin"),
+        ip_address=context["ip_address"],
+        user_agent=context["user_agent"],
     )
     
     db.delete(submission)
+    
+    # Commit atómico: delete + audit_log
     db.commit()

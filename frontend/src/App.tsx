@@ -16,6 +16,7 @@ import {
   X,
   LogIn,
   LogOut,
+  Archive,
 } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
 import Policies from './pages/Policies';
@@ -24,6 +25,7 @@ import CalendarPage from './pages/Calendar';
 import Auditor from './pages/Auditor';
 import SoA from './pages/SoA';
 import NewSubmission from './pages/NewSubmission';
+import Retention from './pages/Retention';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -34,7 +36,7 @@ const queryClient = new QueryClient({
   },
 });
 
-type Page = 'dashboard' | 'policies' | 'requirements' | 'calendar' | 'auditor' | 'soa' | 'new-submission';
+type Page = 'dashboard' | 'policies' | 'requirements' | 'calendar' | 'auditor' | 'soa' | 'new-submission' | 'retention';
 
 const navItems = [
   { id: 'dashboard' as Page, label: 'Tablero', icon: LayoutDashboard },
@@ -43,6 +45,7 @@ const navItems = [
   { id: 'calendar' as Page, label: 'Calendario', icon: Calendar },
   { id: 'soa' as Page, label: 'SoA', icon: Shield },
   { id: 'new-submission' as Page, label: 'Nueva Entrega', icon: FileText },
+  { id: 'retention' as Page, label: 'Retención', icon: Archive },
   { id: 'auditor' as Page, label: 'Auditor', icon: Shield },
 ];
 
@@ -93,6 +96,8 @@ export default function App() {
         return <SoA />;
       case 'new-submission':
         return <NewSubmission />;
+      case 'retention':
+        return <Retention />;
       default:
         return <Dashboard />;
     }

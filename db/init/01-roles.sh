@@ -30,12 +30,19 @@ psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" <<-EOSQL
     ALTER DEFAULT PRIVILEGES FOR ROLE ${POSTGRES_USER} IN SCHEMA public
         GRANT EXECUTE ON FUNCTIONS TO ${DB_APP_USER};
 
+    -- RESTRICCIÓN DE AUDITORÍA: Revocar UPDATE/DELETE sobre audit_log
+    -- Esto garantiza que el usuario de la aplicación solo pueda INSERTAR en audit_log
+    -- pero NUNCA modificar o eliminar registros de auditoría existentes
+    REVOKE UPDATE, DELETE ON audit_log FROM ${DB_APP_USER};
+    
     -- Mensaje de confirmación
     DO \$\$
     BEGIN
         RAISE NOTICE 'Usuario ${DB_APP_USER} configurado exitosamente';
+        RAISE NOTICE 'RESTRICCIÓN: UPDATE/DELETE revocados sobre audit_log';
     END
     \$\$;
 EOSQL
 
 echo "✅ Roles de base de datos configurados"
+echo "🔒 UPDATE/DELETE revocados sobre audit_log para ${DB_APP_USER}"

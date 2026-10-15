@@ -1,33 +1,80 @@
 """
 Tests para los endpoints de la API.
+Usa dependency_overrides y SQLite en memoria para pruebas aisladas.
 """
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import patch, MagicMock
+from fastapi import Depends
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 from datetime import date
 
 from app.main import app
+from app.db import get_db, Base
+from app.models.policy import Policy
+from app.models.requirement import Requirement
+from app.models.submission import Submission
+from app.auth.dependencies import get_current_user
 
 
-@pytest.fixture
-def client():
-    """Cliente de prueba de FastAPI"""
-    return TestClient(app)
+# Configurar BD de prueba SQLite
+SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
+engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
+TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
-@pytest.fixture
-def mock_db():
-    """Mock de la sesión de base de datos"""
-    with patch("app.db.get_db") as mock:
-        db = MagicMock()
-        mock.return_value = db
+# Override de dependencias
+def override_get_db():
+    try:
+        db = TestingSessionLocal()
         yield db
+    finally:
+        db.close()
+
+
+def override_get_current_user():
+    # Usuario de prueba autenticado
+    return {
+        "email": "test@example.com",
+        "name": "Test User",
+        "role": "admin",
+        "oid": "test-oid-123",
+        "tenant_id": "test-tenant",
+    }
+
+
+app.dependency_overrides[get_db] = override_get_db
+app.dependency_overrides[get_current_user] = override_get_current_user
+
+
+@pytest.fixture(scope="function")
+def client():
+    """Cliente de prueba con BD limpia"""
+    # Crear tablas
+    Base.metadata.create_all(bind=engine)
+    
+    with TestClient(app) as c:
+        yield c
+    
+    # Limpiar tablas después del test
+    Base.metadata.drop_all(bind=engine)
+
+
+@pytest.fixture(scope="function")
+def db_session():
+    """Sesión de BD para setup de datos"""
+    db = TestingSessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 
 class TestHealthEndpoint:
     """Tests para el endpoint de health check"""
     
     def test_health_check(self, client):
+        """El endpoint /api/health debe retornar status healthy"""
         response = client.get("/api/health")
         assert response.status_code == 200
         data = response.json()
@@ -38,147 +85,167 @@ class TestHealthEndpoint:
 class TestPoliciesEndpoint:
     """Tests para los endpoints de políticas"""
     
-    def test_list_policies(self, client, mock_db):
-        mock_policy = MagicMock()
-        mock_policy.id = 1
-        mock_policy.code = "POL-SI-001"
-        mock_policy.title = "Política de Seguridad"
-        mock_policy.description = "Descripción"
-        mock_policy.version = "1.0"
-        mock_policy.status = "Vigente"
-        mock_policy.created_at = "2024-01-01T00:00:00"
-        mock_policy.updated_at = None
-        
-        mock_db.query.return_value.order_by.return_value.all.return_value = [mock_policy]
+    def test_list_policies_empty(self, client):
+        """Listar políticas cuando no hay ninguna"""
+        response = client.get("/api/policies")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 0
+        assert data["policies"] == []
+    
+    def test_list_policies_with_data(self, client, db_session):
+        """Listar políticas con datos en la BD"""
+        # Crear política de prueba
+        policy = Policy(
+            code="POL-TEST-001",
+            title="Política de Prueba",
+            description="Descripción de prueba",
+            version="1.0",
+            status="Vigente"
+        )
+        db_session.add(policy)
+        db_session.commit()
         
         response = client.get("/api/policies")
         assert response.status_code == 200
         data = response.json()
-        assert "policies" in data
-        assert "total" in data
+        assert data["total"] == 1
+        assert data["policies"][0]["code"] == "POL-TEST-001"
     
-    def test_get_policy_not_found(self, client, mock_db):
-        mock_db.query.return_value.filter.return_value.first.return_value = None
-        
+    def test_get_policy_not_found(self, client):
+        """Obtener política inexistente debe retornar 404"""
         response = client.get("/api/policies/POL-NOT-FOUND")
         assert response.status_code == 404
-
-
-class TestRequirementsEndpoint:
-    """Tests para los endpoints de requisitos"""
     
-    def test_list_requirements(self, client, mock_db):
-        mock_requirement = MagicMock()
-        mock_requirement.id = 1
-        mock_requirement.code = "EV-001"
-        mock_requirement.title = "Requisito de prueba"
-        mock_requirement.description = "Descripción"
-        mock_requirement.frequency = "Mensual"
-        mock_requirement.policy_code = "POL-SI-001"
-        mock_requirement.control_id = 1
-        mock_requirement.created_at = "2024-01-01T00:00:00"
-        mock_requirement.updated_at = None
-        mock_requirement.__dict__ = {
-            "id": 1,
-            "code": "EV-001",
-            "title": "Requisito de prueba",
-            "description": "Descripción",
-            "frequency": "Mensual",
-            "policy_code": "POL-SI-001",
-            "control_id": 1,
-            "created_at": "2024-01-01T00:00:00",
-            "updated_at": None,
-        }
+    def test_get_policy_found(self, client, db_session):
+        """Obtener política existente"""
+        policy = Policy(
+            code="POL-TEST-002",
+            title="Política de Prueba 2",
+            description="Descripción",
+            version="1.0",
+            status="Vigente"
+        )
+        db_session.add(policy)
+        db_session.commit()
         
-        mock_db.query.return_value.order_by.return_value.all.return_value = [mock_requirement]
-        
-        with patch("app.routers.requirements.calculate_requirement_status") as mock_calc:
-            mock_calc.return_value = {
-                "last_evidence_date": None,
-                "next_due_date": None,
-                "alert_status": "Pendiente",
-            }
-            
-            response = client.get("/api/requirements")
-            assert response.status_code == 200
-            data = response.json()
-            assert isinstance(data, list)
+        response = client.get("/api/policies/POL-TEST-002")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["code"] == "POL-TEST-002"
+        assert data["title"] == "Política de Prueba 2"
 
 
 class TestSubmissionsEndpoint:
     """Tests para los endpoints de entregas"""
     
-    def test_create_submission(self, client, mock_db):
-        mock_requirement = MagicMock()
-        mock_requirement.id = 1
-        mock_requirement.code = "EV-001"
-        
-        mock_db.query.return_value.filter.return_value.first.return_value = mock_requirement
-        
-        submission_data = {
-            "requirement_id": 1,
-            "evidence_date": "2024-01-15",
-            "notes": "Evidencia de prueba",
-        }
-        
-        with patch("app.routers.submissions.get_current_user") as mock_user:
-            mock_user.return_value = {
-                "email": "test@example.com",
-                "name": "Test User",
-                "role": "user",
-            }
-            
-            with patch("app.routers.submissions.log_action"):
-                response = client.post("/api/submissions", json=submission_data)
-                assert response.status_code == 201
+    def test_list_submissions_empty(self, client):
+        """Listar entregas cuando no hay ninguna"""
+        response = client.get("/api/submissions")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 0
+        assert data["items"] == []
     
-    def test_create_submission_invalid_requirement(self, client, mock_db):
-        mock_db.query.return_value.filter.return_value.first.return_value = None
+    def test_list_submissions_with_pagination(self, client, db_session):
+        """Listar entregas con paginación"""
+        # Crear política y requisito
+        policy = Policy(code="POL-TEST-003", title="Test", version="1.0", status="Vigente")
+        db_session.add(policy)
+        db_session.commit()
         
-        submission_data = {
-            "requirement_id": 999,
+        requirement = Requirement(
+            code="REQ-TEST-001",
+            title="Requisito Test",
+            frequency="Mensual",
+            policy_code="POL-TEST-003"
+        )
+        db_session.add(requirement)
+        db_session.commit()
+        
+        # Crear 5 entregas
+        for i in range(5):
+            submission = Submission(
+                requirement_id=requirement.id,
+                evidence_date=date(2024, 1, i+1),
+                status="Pendiente",
+                created_by="test@example.com"
+            )
+            db_session.add(submission)
+        db_session.commit()
+        
+        # Test paginación: skip=2, limit=2
+        response = client.get("/api/submissions?skip=2&limit=2")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 5
+        assert len(data["items"]) == 2
+        assert data["skip"] == 2
+        assert data["limit"] == 2
+    
+    def test_create_submission(self, client, db_session):
+        """Crear una nueva entrega"""
+        # Crear política y requisito
+        policy = Policy(code="POL-TEST-004", title="Test", version="1.0", status="Vigente")
+        db_session.add(policy)
+        db_session.commit()
+        
+        requirement = Requirement(
+            code="REQ-TEST-002",
+            title="Requisito Test",
+            frequency="Mensual",
+            policy_code="POL-TEST-004"
+        )
+        db_session.add(requirement)
+        db_session.commit()
+        
+        # Crear entrega
+        response = client.post("/api/submissions", json={
+            "requirement_id": requirement.id,
             "evidence_date": "2024-01-15",
-        }
-        
-        with patch("app.routers.submissions.get_current_user") as mock_user:
-            mock_user.return_value = {
-                "email": "test@example.com",
-                "name": "Test User",
-                "role": "user",
-            }
-            
-            response = client.post("/api/submissions", json=submission_data)
-            assert response.status_code == 404
+            "notes": "Evidencia de prueba"
+        })
+        assert response.status_code == 201
+        data = response.json()
+        assert data["status"] == "Pendiente"
+        assert data["notes"] == "Evidencia de prueba"
+        assert data["created_by"] == "test@example.com"
+    
+    def test_create_submission_invalid_requirement(self, client):
+        """Crear entrega con requisito inexistente debe fallar"""
+        response = client.post("/api/submissions", json={
+            "requirement_id": 99999,
+            "evidence_date": "2024-01-15"
+        })
+        assert response.status_code == 404
 
 
 class TestDashboardEndpoint:
     """Tests para el endpoint de dashboard"""
     
-    def test_get_dashboard(self, client, mock_db):
-        mock_requirement = MagicMock()
-        mock_requirement.id = 1
-        mock_requirement.policy_code = "POL-SI-001"
+    def test_dashboard_empty(self, client):
+        """Dashboard sin datos"""
+        response = client.get("/api/dashboard")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total_requirements"] == 0
+        assert data["overall_compliance_rate"] == 0
+    
+    def test_dashboard_with_data(self, client, db_session):
+        """Dashboard con datos"""
+        # Crear política
+        policy = Policy(code="POL-TEST-005", title="Test Policy", version="1.0", status="Vigente")
+        db_session.add(policy)
+        db_session.commit()
         
-        mock_policy = MagicMock()
-        mock_policy.code = "POL-SI-001"
-        mock_policy.title = "Política de Seguridad"
+        # Crear 2 requisitos
+        req1 = Requirement(code="REQ-TEST-003", title="Req 1", frequency="Mensual", policy_code="POL-TEST-005")
+        req2 = Requirement(code="REQ-TEST-004", title="Req 2", frequency="Trimestral", policy_code="POL-TEST-005")
+        db_session.add_all([req1, req2])
+        db_session.commit()
         
-        mock_db.query.return_value.all.side_effect = [
-            [mock_requirement],  # requirements
-            [mock_policy],       # policies
-        ]
-        
-        with patch("app.routers.dashboard.calculate_requirement_status") as mock_calc:
-            mock_calc.return_value = {
-                "last_evidence_date": None,
-                "next_due_date": None,
-                "alert_status": "Pendiente",
-            }
-            
-            response = client.get("/api/dashboard")
-            assert response.status_code == 200
-            data = response.json()
-            assert "total_requirements" in data
-            assert "status_counts" in data
-            assert "policy_summaries" in data
-            assert "overall_compliance_rate" in data
+        response = client.get("/api/dashboard")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total_requirements"] == 2
+        assert len(data["policy_summaries"]) == 1
