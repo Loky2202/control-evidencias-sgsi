@@ -12,7 +12,7 @@ from app.db import get_db
 from app.models.requirement import Requirement
 from app.models.policy import Policy
 from app.schemas.dashboard import DashboardResponse, StatusCount, PolicySummary
-from app.services.due_dates import calculate_requirement_status
+from app.services.due_dates import calculate_requirements_status_batch
 from app.auth.dependencies import get_current_user
 
 router = APIRouter()
@@ -35,11 +35,15 @@ def get_dashboard(
     requirements = db.query(Requirement).all()
     total_requirements = len(requirements)
     
+    # OPTIMIZACIÓN: Calcular todos los estados en UNA SOLA CONSULTA (evita N+1)
+    requirement_ids = [req.id for req in requirements]
+    status_map = calculate_requirements_status_batch(requirement_ids, db)
+    
     # Contar por estado
     status_counts = {"Pendiente": 0, "Vigente": 0, "Por vencer": 0, "Vencida": 0}
     
     for req in requirements:
-        status_data = calculate_requirement_status(req.id, db)
+        status_data = status_map.get(req.id, {"alert_status": "Pendiente"})
         alert_status = status_data["alert_status"]
         status_counts[alert_status] = status_counts.get(alert_status, 0) + 1
     
@@ -49,7 +53,7 @@ def get_dashboard(
         for status, count in status_counts.items()
     ]
     
-    # Resumen por política
+    # Resumen por política (usando el status_map ya calculado)
     policies = db.query(Policy).all()
     policy_summaries = []
     
@@ -59,7 +63,7 @@ def get_dashboard(
         
         compliant = 0
         for req in policy_reqs:
-            status_data = calculate_requirement_status(req.id, db)
+            status_data = status_map.get(req.id, {"alert_status": "Pendiente"})
             if status_data["alert_status"] in ["Vigente", "Por vencer"]:
                 compliant += 1
         
@@ -77,9 +81,11 @@ def get_dashboard(
             )
         )
     
-    # Tasa de cumplimiento general
-    total_compliant = sum(1 for r in requirements 
-                         if calculate_requirement_status(r.id, db)["alert_status"] in ["Vigente", "Por vencer"])
+    # Tasa de cumplimiento general (usando el status_map ya calculado)
+    total_compliant = sum(
+        1 for req in requirements 
+        if status_map.get(req.id, {"alert_status": "Pendiente"})["alert_status"] in ["Vigente", "Por vencer"]
+    )
     overall_rate = (total_compliant / total_requirements * 100) if total_requirements > 0 else 0
     
     return DashboardResponse(

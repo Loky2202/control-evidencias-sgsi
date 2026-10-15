@@ -111,25 +111,49 @@ def get_submission(
     return submission
 
 
-@router.get("/submissions", response_model=List[SubmissionResponse])
+@router.get("/submissions")
 def list_submissions(
     requirement_id: Optional[int] = None,
+    skip: int = Query(0, ge=0, description="Número de registros a saltar"),
+    limit: int = Query(100, ge=1, le=1000, description="Número máximo de registros a retornar"),
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),  # Requiere autenticación
 ):
     """
-    Lista entregas, opcionalmente filtradas por requisito.
+    Lista entregas con paginación, opcionalmente filtradas por requisito.
     
     Requiere: Cualquier usuario autenticado
     
     Query Params:
         requirement_id: Filtrar por ID de requisito
+        skip: Número de registros a saltar (default: 0)
+        limit: Número máximo de registros (default: 100, max: 1000)
+    
+    Returns:
+        Dict con 'items', 'total', 'skip', 'limit'
     """
     query = db.query(Submission)
     if requirement_id:
         query = query.filter(Submission.requirement_id == requirement_id)
     
-    return query.order_by(Submission.evidence_date.desc()).all()
+    # Contar total antes de aplicar paginación
+    total = query.count()
+    
+    # Aplicar paginación
+    items = (
+        query
+        .order_by(Submission.evidence_date.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+    
+    return {
+        "items": items,
+        "total": total,
+        "skip": skip,
+        "limit": limit,
+    }
 
 
 @router.patch("/submissions/{id}", response_model=SubmissionResponse)

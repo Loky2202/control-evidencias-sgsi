@@ -1,12 +1,17 @@
 """
 Servicio de cálculo de fechas de vencimiento.
 Determina el estado de cada requisito basado en la última evidencia.
+
+OPTIMIZACIÓN: Usa consultas batch para evitar N+1 en dashboard y requisitos.
 """
 from datetime import date
-from typing import Dict
+from typing import Dict, List
 from sqlalchemy.orm import Session
+from sqlalchemy import func, case
+from dateutil.relativedelta import relativedelta
 
 from app.models.submission import Submission
+from app.models.requirement import Requirement
 
 
 # Mapeo de frecuencia a meses
@@ -22,6 +27,8 @@ FREQUENCY_MONTHS = {
 def calculate_requirement_status(requirement_id: int, db: Session) -> Dict:
     """
     Calcula el estado de un requisito basado en su última evidencia.
+    
+    OPTIMIZACIÓN: Para múltiples requisitos, usa calculate_requirements_status_batch().
     
     Args:
         requirement_id: ID del requisito
@@ -53,7 +60,6 @@ def calculate_requirement_status(requirement_id: int, db: Session) -> Dict:
         }
     
     # Obtener el requisito para conocer su frecuencia
-    from app.models.requirement import Requirement
     requirement = db.query(Requirement).filter(Requirement.id == requirement_id).first()
     
     if not requirement or requirement.frequency not in FREQUENCY_MONTHS:
@@ -63,12 +69,10 @@ def calculate_requirement_status(requirement_id: int, db: Session) -> Dict:
             "alert_status": "Vigente",
         }
     
-    # Calcular próxima fecha de vencimiento
+    # Calcular próxima fecha de vencimiento usando relativedelta
     months = FREQUENCY_MONTHS[requirement.frequency]
     last_date = last_submission.evidence_date
-    
-    # Sumar meses a la fecha
-    next_due = add_months(last_date, months)
+    next_due = last_date + relativedelta(months=months)
     
     # Determinar estado
     today = date.today()
@@ -88,19 +92,100 @@ def calculate_requirement_status(requirement_id: int, db: Session) -> Dict:
     }
 
 
-def add_months(source_date: date, months: int) -> date:
+def calculate_requirements_status_batch(requirement_ids: List[int], db: Session) -> Dict[int, Dict]:
     """
-    Suma meses a una fecha.
+    Calcula el estado de múltiples requisitos en UNA SOLA CONSULTA (evita N+1).
+    
+    OPTIMIZACIÓN: Usa subquery con window function para obtener la última evidencia
+    de cada requisito en una sola consulta, en lugar de N consultas separadas.
     
     Args:
-        source_date: Fecha de origen
-        months: Número de meses a sumar
+        requirement_ids: Lista de IDs de requisitos
+        db: Sesión de base de datos
     
     Returns:
-        Nueva fecha
+        Dict[requirement_id, status_dict] con el estado de cada requisito
     """
-    month = source_date.month - 1 + months
-    year = source_date.year + month // 12
-    month = month % 12 + 1
-    day = min(source_date.day, [31, 29 if year % 4 == 0 and not (year % 100 == 0 and year % 400 != 0) else 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1])
-    return date(year, month, day)
+    if not requirement_ids:
+        return {}
+    
+    # Obtener requisitos con sus frecuencias
+    requirements = (
+        db.query(Requirement)
+        .filter(Requirement.id.in_(requirement_ids))
+        .all()
+    )
+    
+    req_map = {req.id: req for req in requirements}
+    
+    # Subquery para obtener la última evidencia completa de cada requisito
+    # Esto evita N+1: una sola consulta en lugar de N consultas
+    latest_submissions_query = (
+        db.query(
+            Submission.requirement_id,
+            func.max(Submission.evidence_date).label('last_evidence_date')
+        )
+        .filter(
+            Submission.requirement_id.in_(requirement_ids),
+            Submission.status == "Completa"
+        )
+        .group_by(Submission.requirement_id)
+        .subquery()
+    )
+    
+    # Obtener las últimas evidencias
+    latest_submissions = (
+        db.query(latest_submissions_query.c.requirement_id, latest_submissions_query.c.last_evidence_date)
+        .all()
+    )
+    
+    # Crear mapa de requirement_id -> last_evidence_date
+    evidence_map = {row[0]: row[1] for row in latest_submissions}
+    
+    # Calcular estado para cada requisito
+    results = {}
+    today = date.today()
+    
+    for req_id in requirement_ids:
+        req = req_map.get(req_id)
+        last_evidence_date = evidence_map.get(req_id)
+        
+        # Si no hay evidencia, está pendiente
+        if not last_evidence_date:
+            results[req_id] = {
+                "last_evidence_date": None,
+                "next_due_date": None,
+                "alert_status": "Pendiente",
+            }
+            continue
+        
+        # Si no hay requisito o frecuencia inválida
+        if not req or req.frequency not in FREQUENCY_MONTHS:
+            results[req_id] = {
+                "last_evidence_date": last_evidence_date,
+                "next_due_date": None,
+                "alert_status": "Vigente",
+            }
+            continue
+        
+        # Calcular próxima fecha usando relativedelta
+        months = FREQUENCY_MONTHS[req.frequency]
+        next_due = last_evidence_date + relativedelta(months=months)
+        
+        # Determinar estado
+        days_until_due = (next_due - today).days
+        
+        if days_until_due < 0:
+            alert_status = "Vencida"
+        elif days_until_due <= 30:
+            alert_status = "Por vencer"
+        else:
+            alert_status = "Vigente"
+        
+        results[req_id] = {
+            "last_evidence_date": last_evidence_date,
+            "next_due_date": next_due,
+            "alert_status": alert_status,
+        }
+    
+    return results
